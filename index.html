@@ -1255,14 +1255,19 @@
                 window.setup_scratch = setup_scratch;
                 document.getElementById('scratch-new-btn').addEventListener('click', setup_scratch);
 
-                // --- WHEEL OF FORTUNE LOGIC ---
+                // --- WHEEL OF FORTUNE LOGIC (UPDATED) ---
                 const wheelCanvas = document.getElementById('wheelCanvas');
                 const wheelCtx = wheelCanvas.getContext('2d');
+                // [MODIFIED] New segments with negative (loss) values
                 const segments = [
-                    { color: '#DC2626', label: '1x' }, { color: '#F59E0B', label: '3x' }, 
-                    { color: '#10B981', label: '2x' }, { color: '#3B82F6', label: '5x' },
-                    { color: '#6366F1', label: '0.5x'}, { color: '#EC4899', label: '10x'},
-                    { color: '#F59E0B', label: '3x' }, { color: '#10B981', label: '2x' }
+                    { color: '#10B981', label: '1x' },  // Green
+                    { color: '#3B82F6', label: '3x' },  // Blue
+                    { color: '#F59E0B', label: '2x' },  // Amber
+                    { color: '#6366F1', label: '5x' },  // Indigo
+                    { color: '#DC2626', label: '-5x'}, // Red (loss)
+                    { color: '#EC4899', label: '10x'}, // Pink (big win)
+                    { color: '#9333EA', label: '-3x' }, // Purple (loss)
+                    { color: '#EF4444', label: '-2x' }  // Lighter Red (loss)
                 ];
                 const segmentAngle = (2 * Math.PI) / segments.length;
                 
@@ -1293,21 +1298,42 @@
                     const resultEl = document.getElementById('wheel-result');
                     const spinBtn = document.getElementById('wheel-spin-btn');
                      if(currentUser.balance < bet) { resultEl.textContent = 'Saldo tidak cukup!'; return; }
-                     currentUser.balance -= bet;
+                     // For losses, the balance is reduced *after* the result is shown. For wins, the bet is deducted first.
+                     if(!resultEl.textContent.includes('Kalah')) { // Don't double deduct on loss
+                        currentUser.balance -= bet;
+                     }
                      saveUserData();
                      spinBtn.disabled = true;
+                     resultEl.textContent = '';
+                     resultEl.style.color = ''; // Reset result color
 
                      const randomSpin = Math.random() * 360 + 360 * 5; // Spin at least 5 times
                      wheelCanvas.style.transform = `rotate(${randomSpin}deg)`;
                      
                      setTimeout(() => {
-                         const finalAngle = randomSpin % 360;
-                         const winningIndex = Math.floor(segments.length - finalAngle / (360 / segments.length)) % segments.length;
-                         const winningSegment = segments[winningIndex];
-                         const multiplier = parseFloat(winningSegment.label.replace('x', ''));
-                         const winnings = bet * multiplier;
-                         currentUser.balance += winnings;
-                         resultEl.textContent = `Anda dapat ${winningSegment.label}! Menang ${winnings.toLocaleString('id-ID')}!`;
+                        // [BUG FIXED] Correctly calculate the winning segment based on final angle
+                        const degreesPerSegment = 360 / segments.length;
+                        const finalAngle = randomSpin % 360;
+                        // The pointer is at 270 degrees. We find what segment lands there.
+                        const normalizedAngle = (270 - finalAngle + 360) % 360;
+                        const winningIndex = Math.floor(normalizedAngle / degreesPerSegment);
+
+                        const winningSegment = segments[winningIndex];
+                        const multiplier = parseFloat(winningSegment.label.replace('x', ''));
+                        
+                        // [MODIFIED] Handle both wins and losses
+                        const changeAmount = bet * multiplier;
+                        currentUser.balance += changeAmount; // This adds winnings or subtracts losses
+
+                        if (changeAmount >= 0) {
+                            resultEl.textContent = `Anda dapat ${winningSegment.label}! Menang ${changeAmount.toLocaleString('id-ID')}!`;
+                            resultEl.style.color = '#22C55E'; // Green for win
+                        } else {
+                            // The bet was already deducted, so we only account for the loss multiplier beyond the initial bet
+                             resultEl.textContent = `Anda dapat ${winningSegment.label}! Kalah ${Math.abs(changeAmount).toLocaleString('id-ID')}!`;
+                             resultEl.style.color = '#EF4444'; // Red for loss
+                        }
+                         
                          saveUserData();
                          spinBtn.disabled = false;
                      }, 4100);
@@ -1319,5 +1345,3 @@
     </script>
 </body>
 </html>
-
-
