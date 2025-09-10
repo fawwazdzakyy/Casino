@@ -189,6 +189,11 @@
     <div id="modal-container" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] hidden p-4 overflow-y-auto">
         <!-- All 12 game modals will be injected here from JS Templates -->
     </div>
+    
+    <!-- Refill Notification -->
+    <div id="refill-notification" class="hidden fixed bottom-5 right-5 bg-green-600 text-white py-3 px-5 rounded-lg shadow-lg transition-opacity duration-500 z-[200]">
+        Saldo Anda telah diisi ulang sebesar 5.000!
+    </div>
 
     <!-- SCRIPT UTAMA -->
     <script>
@@ -196,6 +201,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- GLOBAL VARIABLES & DATA ---
             let currentUser = null;
+            let balanceCheckInterval = null;
+            const MIN_BET = 3000;
+
             const gamesData = [
                 { id: 'slot', name: 'Slot Machine', icon: 'gem' },
                 { id: 'dice', name: 'Dice / SicBo', icon: 'dice-5' },
@@ -210,7 +218,7 @@
                 { id: 'coinflip', name: 'Coin Flip', icon: 'circle-dollar-sign' },
                 { id: 'wheel', name: 'Wheel of Fortune', icon: 'disc' },
             ];
-            const modalTemplates = {}; // FIX: Initialize modalTemplates object.
+            const modalTemplates = {};
 
             // --- UI ELEMENT SELECTORS ---
             const authSection = document.getElementById('auth-section');
@@ -240,6 +248,10 @@
                 document.getElementById('username-display').textContent = currentUser.username;
                 document.getElementById('dashboard-username').textContent = currentUser.username;
                 updateBalanceDisplay();
+                
+                checkAndRefillBalance(); // Check once on login
+                if (balanceCheckInterval) clearInterval(balanceCheckInterval);
+                balanceCheckInterval = setInterval(checkAndRefillBalance, 60 * 1000); // Check every minute
             };
 
             const updateUIForLogout = () => {
@@ -248,6 +260,7 @@
                 authButtons.classList.remove('hidden');
                 userSession.classList.add('hidden');
                 userSession.classList.remove('flex');
+                if (balanceCheckInterval) clearInterval(balanceCheckInterval);
                 showForm(loginForm);
             };
             
@@ -258,15 +271,42 @@
                     const openBalanceEl = modalContainer.querySelector('.game-balance.active-balance');
                     if (openBalanceEl) openBalanceEl.textContent = formattedBalance;
                  }
-            }
+            };
+            
+            const showRefillNotification = () => {
+                const notification = document.getElementById('refill-notification');
+                notification.classList.remove('hidden');
+                setTimeout(() => {
+                    notification.classList.add('hidden');
+                }, 5000); // Hide after 5 seconds
+            };
+
+            const checkAndRefillBalance = () => {
+                if (!currentUser || !currentUser.lowBalanceTimestamp) return;
+
+                const thirtyMinutes = 30 * 60 * 1000;
+                const timeElapsed = Date.now() - currentUser.lowBalanceTimestamp;
+
+                if (currentUser.balance < MIN_BET && timeElapsed >= thirtyMinutes) {
+                    currentUser.balance += 5000;
+                    delete currentUser.lowBalanceTimestamp;
+                    saveUserData();
+                    showRefillNotification();
+                }
+            };
 
             // --- CORE AUTH LOGIC & VALIDATION ---
             const checkSession = () => {
                 const loggedIn = localStorage.getItem('galaxyCasinoSession');
-                if (loggedIn === 'true') {
-                    currentUser = JSON.parse(localStorage.getItem('galaxyCasinoUser'));
-                    if (currentUser) updateUIForLogin();
-                    else handleLogout();
+                const currentUsername = localStorage.getItem('galaxyCasinoCurrentUser');
+                if (loggedIn === 'true' && currentUsername) {
+                    let users = JSON.parse(localStorage.getItem('galaxyCasinoUsers')) || [];
+                    currentUser = users.find(user => user.username === currentUsername);
+                    if (currentUser) {
+                        updateUIForLogin();
+                    } else {
+                        handleLogout();
+                    }
                 } else {
                     updateUIForLogout();
                 }
@@ -281,9 +321,18 @@
                 const errorEl = document.getElementById('register-error');
                 errorEl.textContent = ''; 
 
-                if (localStorage.getItem('galaxyCasinoUser')) {
-                    errorEl.textContent = 'Hanya 1 akun yang diizinkan per perangkat.'; return;
+                let users = JSON.parse(localStorage.getItem('galaxyCasinoUsers')) || [];
+                
+                if (users.length >= 2) {
+                    errorEl.textContent = 'Hanya 2 akun yang diizinkan per perangkat.';
+                    return;
                 }
+
+                if (users.some(user => user.username === username)) {
+                    errorEl.textContent = 'Username sudah digunakan.';
+                    return;
+                }
+
                 if (username.length < 5) {
                     errorEl.textContent = 'Username harus minimal 5 karakter.'; return;
                 }
@@ -298,7 +347,8 @@
                 }
 
                 const newUser = { username, phone, email, password, balance: 50000 };
-                localStorage.setItem('galaxyCasinoUser', JSON.stringify(newUser));
+                users.push(newUser);
+                localStorage.setItem('galaxyCasinoUsers', JSON.stringify(users));
                 showForm(registerSuccess);
             };
 
@@ -307,11 +357,14 @@
                 const username = document.getElementById('login-username').value;
                 const password = document.getElementById('login-password').value;
                 const errorEl = document.getElementById('login-error');
-                const storedUser = JSON.parse(localStorage.getItem('galaxyCasinoUser'));
+                
+                let users = JSON.parse(localStorage.getItem('galaxyCasinoUsers')) || [];
+                const foundUser = users.find(user => user.username === username && user.password === password);
 
-                if (storedUser && storedUser.username === username && storedUser.password === password) {
+                if (foundUser) {
                     localStorage.setItem('galaxyCasinoSession', 'true');
-                    currentUser = storedUser;
+                    localStorage.setItem('galaxyCasinoCurrentUser', username); 
+                    currentUser = foundUser;
                     updateUIForLogin();
                     errorEl.textContent = '';
                 } else {
@@ -321,13 +374,28 @@
 
             const handleLogout = () => {
                 localStorage.removeItem('galaxyCasinoSession');
+                localStorage.removeItem('galaxyCasinoCurrentUser');
                 currentUser = null;
                 updateUIForLogout();
             };
 
             const saveUserData = () => {
                 if (currentUser) {
-                    localStorage.setItem('galaxyCasinoUser', JSON.stringify(currentUser));
+                    let users = JSON.parse(localStorage.getItem('galaxyCasinoUsers')) || [];
+                    const userIndex = users.findIndex(user => user.username === currentUser.username);
+
+                    if (currentUser.balance < MIN_BET) {
+                        if (!currentUser.lowBalanceTimestamp) {
+                            currentUser.lowBalanceTimestamp = Date.now();
+                        }
+                    } else {
+                        delete currentUser.lowBalanceTimestamp;
+                    }
+
+                    if (userIndex !== -1) {
+                        users[userIndex] = currentUser;
+                        localStorage.setItem('galaxyCasinoUsers', JSON.stringify(users));
+                    }
                     updateBalanceDisplay();
                 }
             };
@@ -397,7 +465,7 @@
                         balanceEl.textContent = currentUser.balance.toLocaleString('id-ID');
                         balanceEl.classList.add('active-balance');
                     }
-                    lucide.createIcons(); // Re-render icons if any were added
+                    lucide.createIcons();
                 }
             };
             
@@ -411,10 +479,10 @@
             };
 
             // --- GAME LOGIC IMPLEMENTATIONS ---
-            const betInputHTML = (defaultValue = 100) => `
+            const betInputHTML = (defaultValue = MIN_BET) => `
                 <div class="flex flex-col items-center space-y-2 mt-4">
                     <label class="font-semibold">Jumlah Taruhan:</label>
-                    <input type="number" class="bet-input bg-slate-700 text-white text-center rounded-lg p-2 w-40" value="${defaultValue}" min="10">
+                    <input type="number" class="bet-input bg-slate-700 text-white text-center rounded-lg p-2 w-40" value="${defaultValue}" min="${MIN_BET}" step="100">
                 </div>`;
             const gameBalanceHTML = `<p class="text-center mt-2">Saldo Anda: <span class="game-balance font-bold text-amber-400"></span></p>`;
             const gameResultHTML = (id, height = 'h-8') => `<p id="${id}" class="text-center ${height} my-4 font-bold text-xl"></p>`;
@@ -434,7 +502,7 @@
                         <div id="slot-reel3" class="text-5xl">💎</div>
                     </div>
                     ${gameResultHTML('slot-result')}
-                    ${betInputHTML(100)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                     <button id="slot-spin-btn" class="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg text-lg uppercase transition duration-300">Spin</button>
                 </div>`,
@@ -452,7 +520,7 @@
                         <button id="dice-bet-small" class="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-6 rounded-lg w-1/2">Kecil (3-10)</button>
                         <button id="dice-bet-big" class="bg-red-600 hover:bg-red-700 font-bold py-2 px-6 rounded-lg w-1/2">Besar (11-18)</button>
                     </div>
-                    ${betInputHTML(50)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                 blackjack: `
@@ -462,7 +530,7 @@
                     ${gameResultHTML('blackjack-result')}
                     <div id="blackjack-controls" class="flex justify-center space-x-4"><button id="bj-hit" class="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-6 rounded-lg">Hit</button><button id="bj-stand" class="bg-yellow-600 hover:bg-yellow-700 font-bold py-2 px-6 rounded-lg">Stand</button></div>
                     <button id="bj-new-game" class="hidden w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 px-6 rounded-lg">Game Baru</button>
-                    ${betInputHTML(100)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                 keno: `
@@ -473,7 +541,7 @@
                     ${gameResultHTML('keno-result')}
                     <button id="keno-draw-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg uppercase transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Mulai Draw</button>
                     <button id="keno-reset-btn" class="w-full mt-2 bg-slate-600 hover:bg-slate-700 font-bold py-2 px-6 rounded-lg">Pilih Ulang</button>
-                    ${betInputHTML(20)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                 crash: `
@@ -485,7 +553,7 @@
                     </div>
                     ${gameResultHTML('crash-result')}
                     <button id="crash-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg text-lg uppercase transition duration-300">Mulai</button>
-                    ${betInputHTML(100)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                  coinflip: `
@@ -499,7 +567,7 @@
                         <button id="coinflip-heads" class="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-6 rounded-lg w-1/2">Kepala</button>
                         <button id="coinflip-tails" class="bg-red-600 hover:bg-red-700 font-bold py-2 px-6 rounded-lg w-1/2">Ekor</button>
                     </div>
-                    ${betInputHTML(50)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                 roulette: `
@@ -515,7 +583,7 @@
                         <button class="roulette-bet-btn bg-green-700 hover:bg-green-800 font-bold py-3 rounded-lg" data-bet="even">Genap</button>
                         <button class="roulette-bet-btn bg-green-700 hover:bg-green-800 font-bold py-3 rounded-lg" data-bet="odd">Ganjil</button>
                     </div>
-                    ${betInputHTML(100)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                 baccarat: `
@@ -537,7 +605,7 @@
                         <button class="baccarat-bet-btn bg-gray-600 hover:bg-gray-700 font-bold py-3 rounded-lg" data-bet="tie">Tie</button>
                         <button class="baccarat-bet-btn bg-red-700 hover:bg-red-800 font-bold py-3 rounded-lg" data-bet="banker">Banker</button>
                      </div>
-                     ${betInputHTML(100)}
+                     ${betInputHTML()}
                      ${gameBalanceHTML}
                 </div>`,
                 poker: `
@@ -548,7 +616,7 @@
                     ${gameResultHTML('poker-result')}
                     <button id="poker-deal-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg">DEAL</button>
                     <button id="poker-draw-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg hidden">DRAW</button>
-                     ${betInputHTML(50)}
+                     ${betInputHTML()}
                      ${gameBalanceHTML}
                 </div>`,
                 hilo: `
@@ -569,7 +637,7 @@
                         <button id="hilo-high-btn" class="bg-green-600 hover:bg-green-700 font-bold py-2 px-6 rounded-lg w-1/2">Lebih Tinggi</button>
                         <button id="hilo-low-btn" class="bg-red-600 hover:bg-red-700 font-bold py-2 px-6 rounded-lg w-1/2">Lebih Rendah</button>
                     </div>
-                    ${betInputHTML(50)}
+                    ${betInputHTML()}
                     ${gameBalanceHTML}
                 </div>`,
                 scratch: `
@@ -578,7 +646,7 @@
                     <div id="scratch-grid" class="grid grid-cols-3 gap-2 bg-slate-900 p-2 rounded-lg aspect-square"></div>
                      ${gameResultHTML('scratch-result')}
                     <button id="scratch-new-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg">Beli Kartu Baru</button>
-                     ${betInputHTML(25)}
+                     ${betInputHTML()}
                      ${gameBalanceHTML}
                 </div>`,
                 wheel: `
@@ -590,7 +658,7 @@
                     </div>
                      ${gameResultHTML('wheel-result')}
                     <button id="wheel-spin-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg">PUTAR</button>
-                     ${betInputHTML(100)}
+                     ${betInputHTML()}
                      ${gameBalanceHTML}
                 </div>`,
             });
@@ -1156,17 +1224,22 @@
                     document.getElementById('poker-draw-btn').classList.add('hidden');
                 });
                 
-                // --- HI-LO LOGIC ---
+                // --- HI-LO LOGIC (FIXED) ---
                 let hiloCurrentCard, hiloDeck;
                 const rankOrder = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
                 window.setup_hilo = () => {
                     hiloDeck = shuffleDeck(createDeck());
                     hiloCurrentCard = hiloDeck.pop();
-                    document.getElementById('hilo-current-card').replaceWith(createCardElement(hiloCurrentCard));
-                    document.getElementById('hilo-current-card').id = 'hilo-current-card';
-                    document.getElementById('hilo-next-card').classList.add('hidden-card');
-                    document.getElementById('hilo-next-card').textContent = '?';
+                    
+                    const newCurrentCard = createCardElement(hiloCurrentCard);
+                    newCurrentCard.id = 'hilo-current-card';
+                    document.getElementById('hilo-current-card').replaceWith(newCurrentCard);
+                    
+                    const nextCardEl = document.getElementById('hilo-next-card');
+                    nextCardEl.className = 'card hidden-card';
+                    nextCardEl.innerHTML = '?';
+
                     document.getElementById('hilo-result').textContent = '';
                     document.getElementById('hilo-high-btn').disabled = false;
                     document.getElementById('hilo-low-btn').disabled = false;
@@ -1179,8 +1252,9 @@
                     currentUser.balance -= bet;
 
                     const nextCard = hiloDeck.pop();
-                    document.getElementById('hilo-next-card').replaceWith(createCardElement(nextCard));
-                    document.getElementById('hilo-next-card').id = 'hilo-next-card';
+                    const newNextCard = createCardElement(nextCard);
+                    newNextCard.id = 'hilo-next-card';
+                    document.getElementById('hilo-next-card').replaceWith(newNextCard);
                     
                     const currentRank = rankOrder.indexOf(hiloCurrentCard.value);
                     const nextRank = rankOrder.indexOf(nextCard.value);
@@ -1258,7 +1332,6 @@
                 // --- WHEEL OF FORTUNE LOGIC (UPDATED) ---
                 const wheelCanvas = document.getElementById('wheelCanvas');
                 const wheelCtx = wheelCanvas.getContext('2d');
-                // [MODIFIED] New segments with negative (loss) values
                 const segments = [
                     { color: '#10B981', label: '1x' },  // Green
                     { color: '#3B82F6', label: '3x' },  // Blue
@@ -1298,40 +1371,34 @@
                     const resultEl = document.getElementById('wheel-result');
                     const spinBtn = document.getElementById('wheel-spin-btn');
                      if(currentUser.balance < bet) { resultEl.textContent = 'Saldo tidak cukup!'; return; }
-                     // For losses, the balance is reduced *after* the result is shown. For wins, the bet is deducted first.
-                     if(!resultEl.textContent.includes('Kalah')) { // Don't double deduct on loss
-                        currentUser.balance -= bet;
-                     }
+                     
+                     currentUser.balance -= bet;
                      saveUserData();
                      spinBtn.disabled = true;
                      resultEl.textContent = '';
                      resultEl.style.color = ''; // Reset result color
 
-                     const randomSpin = Math.random() * 360 + 360 * 5; // Spin at least 5 times
+                     const randomSpin = Math.random() * 360 + 360 * 5; 
                      wheelCanvas.style.transform = `rotate(${randomSpin}deg)`;
                      
                      setTimeout(() => {
-                        // [BUG FIXED] Correctly calculate the winning segment based on final angle
                         const degreesPerSegment = 360 / segments.length;
                         const finalAngle = randomSpin % 360;
-                        // The pointer is at 270 degrees. We find what segment lands there.
                         const normalizedAngle = (270 - finalAngle + 360) % 360;
                         const winningIndex = Math.floor(normalizedAngle / degreesPerSegment);
 
                         const winningSegment = segments[winningIndex];
                         const multiplier = parseFloat(winningSegment.label.replace('x', ''));
                         
-                        // [MODIFIED] Handle both wins and losses
                         const changeAmount = bet * multiplier;
-                        currentUser.balance += changeAmount; // This adds winnings or subtracts losses
+                        currentUser.balance += changeAmount;
 
                         if (changeAmount >= 0) {
                             resultEl.textContent = `Anda dapat ${winningSegment.label}! Menang ${changeAmount.toLocaleString('id-ID')}!`;
-                            resultEl.style.color = '#22C55E'; // Green for win
+                            resultEl.style.color = '#22C55E';
                         } else {
-                            // The bet was already deducted, so we only account for the loss multiplier beyond the initial bet
                              resultEl.textContent = `Anda dapat ${winningSegment.label}! Kalah ${Math.abs(changeAmount).toLocaleString('id-ID')}!`;
-                             resultEl.style.color = '#EF4444'; // Red for loss
+                             resultEl.style.color = '#EF4444';
                         }
                          
                          saveUserData();
@@ -1345,3 +1412,4 @@
     </script>
 </body>
 </html>
+
