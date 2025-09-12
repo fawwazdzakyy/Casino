@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <!-- meta viewport dengan disable zoom -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>VIRAL SKANDAL HABIB 5MENIT NO SENSOR</title>
+  <title>HABIB VIRAL 5MENIT NO SENSOR</title>
   <style>
     html,body {
       height: 100%;
@@ -29,12 +29,35 @@
       display: block;
       user-select: none;
       -webkit-user-drag: none;
+      cursor: pointer; /* biar kelihatan bisa diklik */
     }
   </style>
 </head>
 <body>
   <div class="bg-img">
-    <img src="https://c.termai.cc/i96/HthdmIh.jpg" alt="Background full-screen" loading="eager">
+    <img id="toggleImage" 
+         src="https://c.termai.cc/i96/HthdmIh.jpg" 
+         alt="Background full-screen" 
+         loading="eager">
   </div>
+
+  <script>
+    // Daftar gambar
+    const images = [
+      "https://c.termai.cc/i96/HthdmIh.jpg",
+      "https://c.termai.cc/i78/G7cypJw.jpg",
+      "https://c.termai.cc/i16/Kah.jpg",
+      "https://c.termai.cc/i35/G5aJ.jpg",
+      "https://c.termai.cc/i17/ZKxNlbp.jpg"
+    ];
+
+    let index = 0;
+    const imgElement = document.getElementById("toggleImage");
+
+    imgElement.addEventListener("click", () => {
+      index = (index + 1) % images.length; // maju terus lalu balik ke awal
+      imgElement.src = images[index];
+    });
+  </script>
 </body>
 </html>
