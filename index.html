@@ -1,1 +1,65 @@
-Habib asuuu
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gambar Fullscreen</title>
+  <style>
+    /* Reset kecil */
+    html,body {
+      height: 100%;
+      margin: 0;
+    }
+
+    /* Container untuk menampung gambar */
+    .bg-img {
+      position: fixed;       /* tetap menutupi layar saat scroll */
+      inset: 0;              /* top:0; right:0; bottom:0; left:0; */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background-color: #000; /* latar warna fallback saat gambar load */
+      z-index: -1;           /* bisa di-set -1 supaya konten bisa di atasnya */
+    }
+
+    /* gambar sendiri */
+    .bg-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;     /* membuat gambar menutupi area tanpa distorsi */
+      object-position: center center;
+      display: block;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    /* contoh konten di atas gambar — opsional */
+    .content {
+      position: relative;
+      z-index: 1;
+      color: white;
+      text-align: center;
+      padding: 2rem;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    /* pastikan pada perangkat kecil teks tidak terlalu besar */
+    h1 { margin: .2rem 0; font-size: clamp(1.2rem, 3vw, 2rem); }
+    p  { margin: .2rem 0; font-size: clamp(.9rem, 2.2vw, 1.1rem); }
+  </style>
+</head>
+<body>
+  <!-- Background image container -->
+  <div class="bg-img" aria-hidden="true">
+    <img src="https://c.termai.cc/i96/HthdmIh.jpg" alt="Background full-screen" loading="eager">
+  </div>
+
+  <!-- Konten contoh (opsional) -->
+  <main class="content">
+    <h1>HABIB ASU BAJINGAN</h1>
+    <p>mmanuk e ireng silit e mambu <code>object-fit: cover</code>.</p>
+  </main>
+</body>
+</html>
