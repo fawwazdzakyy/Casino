@@ -84,7 +84,7 @@
             margin-left: auto;
             margin-right: auto;
         }
-        #wheelCanvas, #crash-canvas {
+        #wheelCanvas, #crash-canvas, #trading-canvas {
             width: 100%;
             height: 100%;
             border-radius: 0.5rem;
@@ -201,7 +201,7 @@
 
     <!-- Game Modals Container -->
     <div id="modal-container" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] hidden p-4 overflow-y-auto">
-        <!-- All 12 game modals will be injected here from JS Templates -->
+        <!-- All game modals will be injected here from JS Templates -->
     </div>
     
     <!-- Refill Notification -->
@@ -224,6 +224,7 @@
                 { id: 'blackjack', name: 'Blackjack', icon: 'spade' },
                 { id: 'keno', name: 'Keno', icon: 'app-window' },
                 { id: 'crash', name: 'Crash Game', icon: 'trending-up' },
+                { id: 'trading', name: 'Trading', icon: 'line-chart' },
                 { id: 'roulette', name: 'Roulette', icon: 'circle-dashed' },
                 { id: 'baccarat', name: 'Baccarat', icon: 'user-square-2' },
                 { id: 'poker', name: 'Video Poker', icon: 'layers' },
@@ -231,6 +232,7 @@
                 { id: 'scratch', name: 'Scratch Cards', icon: 'sparkles' },
                 { id: 'coinflip', name: 'Coin Flip', icon: 'circle-dollar-sign' },
                 { id: 'wheel', name: 'Wheel of Fortune', icon: 'disc' },
+                { id: 'guessnumber', name: 'Tebak Angka', icon: 'hash' }
             ];
             const modalTemplates = {};
 
@@ -433,24 +435,16 @@
             });
             
             const handleCanvasResize = () => {
-                // Wheel of Fortune Canvas
-                const wheelCanvas = document.getElementById('wheelCanvas');
-                if (wheelCanvas && wheelCanvas.offsetParent !== null) {
-                    const container = wheelCanvas.parentElement;
-                    const size = container.clientWidth;
-                    wheelCanvas.width = size;
-                    wheelCanvas.height = size;
-                    if(window.drawWheel) window.drawWheel();
-                }
-
-                // Crash Game Canvas
-                const crashCanvas = document.getElementById('crash-canvas');
-                if (crashCanvas && crashCanvas.offsetParent !== null) {
-                    const container = crashCanvas.parentElement;
-                    crashCanvas.width = container.clientWidth;
-                    crashCanvas.height = container.clientHeight;
-                    if(window.drawCrashGraph) window.drawCrashGraph();
-                }
+                const canvases = ['wheelCanvas', 'crash-canvas', 'trading-canvas'];
+                canvases.forEach(id => {
+                    const canvas = document.getElementById(id);
+                    if (canvas && canvas.offsetParent !== null) {
+                        const container = canvas.parentElement;
+                        canvas.width = container.clientWidth;
+                        canvas.height = container.clientHeight;
+                        if(window[`draw_${id.replace('-', '')}`]) window[`draw_${id.replace('-', '')}`]();
+                    }
+                });
             };
 
             // --- GAME & MODAL INITIALIZATION ---
@@ -501,7 +495,7 @@
                         window[`setup_${gameId}`]();
                     }
                     
-                    if (gameId === 'wheel' || gameId === 'crash') {
+                    if (['wheel', 'crash', 'trading'].includes(gameId)) {
                         setTimeout(handleCanvasResize, 50); // Delay to allow modal animation
                     }
                     
@@ -720,6 +714,49 @@
                      ${betInputHTML()}
                      ${gameBalanceHTML}
                 </div>`,
+                guessnumber: `
+                <div id="modal-guessnumber" class="modal-content bg-slate-800 p-6 rounded-lg shadow-2xl w-[95%] sm:w-full max-w-md hidden relative">
+                    ${modalHeader('Tebak Angka (1-100)', 'hash')}
+                    <div id="guessnumber-start-screen">
+                        <p class="text-center my-4">Pasang taruhan untuk memulai. Anda punya 3 kesempatan untuk menebak angka rahasia.</p>
+                        ${betInputHTML()}
+                        <button id="guessnumber-start-btn" class="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg">PASANG TARUHAN & MULAI</button>
+                    </div>
+                    <div id="guessnumber-game-screen" class="hidden">
+                        <div class="flex flex-col items-center space-y-2">
+                            <label for="guessnumber-input" class="font-semibold">Masukkan tebakan Anda:</label>
+                            <input type="number" id="guessnumber-input" class="bg-slate-700 text-white text-center rounded-lg p-2 w-40" min="1" max="100">
+                            <button id="guessnumber-guess-btn" class="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-8 rounded-lg mt-2">TEBAK</button>
+                        </div>
+                        <p class="text-center mt-2 text-amber-300">Sisa Kesempatan: <span id="guessnumber-attempts">3</span></p>
+                    </div>
+                    ${gameResultHTML('guessnumber-result')}
+                    ${gameBalanceHTML}
+                </div>`,
+                trading: `
+                <div id="modal-trading" class="modal-content bg-slate-800 p-6 rounded-lg shadow-2xl w-[95%] sm:w-full max-w-2xl hidden relative">
+                    ${modalHeader('Trading', 'line-chart')}
+                    <div id="trading-start-screen">
+                        <p class="text-center my-4">Prediksi apakah harga akan NAIK atau TURUN dalam 20 detik ke depan untuk memenangkan hadiah!</p>
+                        ${betInputHTML()}
+                        <button id="trading-start-btn" class="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg">MULAI TRADING</button>
+                    </div>
+                    <div id="trading-game-screen" class="hidden">
+                        <div class="relative bg-slate-900 rounded-lg h-64 p-2">
+                            <canvas id="trading-canvas"></canvas>
+                            <div id="trading-info-overlay" class="absolute top-2 right-2 bg-black/50 p-2 rounded text-right text-sm">
+                                <p>Waktu: <span id="trading-timer" class="font-bold text-amber-300">20</span>s</p>
+                                <p>Harga: <span id="trading-price" class="font-bold text-white">100.00</span></p>
+                            </div>
+                        </div>
+                        <div id="trading-controls" class="flex justify-center space-x-4 mt-4">
+                            <button id="trading-up-btn" class="w-1/2 bg-green-600 hover:bg-green-700 font-bold py-3 rounded-lg flex items-center justify-center gap-2">Naik <i data-lucide="trending-up"></i></button>
+                            <button id="trading-down-btn" class="w-1/2 bg-red-600 hover:bg-red-700 font-bold py-3 rounded-lg flex items-center justify-center gap-2">Turun <i data-lucide="trending-down"></i></button>
+                        </div>
+                    </div>
+                    ${gameResultHTML('trading-result')}
+                    ${gameBalanceHTML}
+                </div>`
             });
             
             // --- ATTACH ALL GAME LOGIC LISTENERS ---
@@ -1081,7 +1118,7 @@
                 const multiplierEl = document.getElementById('crash-multiplier-display');
                 const crashBtn = document.getElementById('crash-btn');
                 const crashResultEl = document.getElementById('crash-result');
-                window.drawCrashGraph = () => {
+                window.draw_crashcanvas = () => {
                     if (!crashCanvas.getContext) return;
                     crashCtx.clearRect(0, 0, crashCanvas.width, crashCanvas.height);
                     crashCtx.beginPath();
@@ -1106,7 +1143,7 @@
                     }
                     
                     multiplierEl.textContent = `${multiplier.toFixed(2)}x`;
-                    drawCrashGraph();
+                    draw_crashcanvas();
 
                     if (multiplier >= crashPoint) {
                         gameState = 'crashed';
@@ -1543,7 +1580,7 @@
                 ];
                 const segmentAngle = (2 * Math.PI) / segments.length;
                 
-                window.drawWheel = () => {
+                window.draw_wheelCanvas = () => {
                     if (!wheelCanvas.getContext) return;
                     const size = wheelCanvas.width;
                     const radius = size / 2;
@@ -1618,6 +1655,251 @@
                          spinBtn.disabled = false;
                      }, 4100);
                 });
+
+                // --- GUESS THE NUMBER LOGIC ---
+                let guessNumberSecret, guessNumberAttempts, guessNumberBet;
+                
+                const endGuessNumberGame = () => {
+                    document.getElementById('guessnumber-game-screen').classList.add('hidden');
+                    document.getElementById('guessnumber-start-screen').classList.remove('hidden');
+                    document.querySelector('#modal-guessnumber .bet-input').disabled = false;
+                };
+
+                window.setup_guessnumber = () => {
+                    document.getElementById('guessnumber-start-screen').classList.remove('hidden');
+                    document.getElementById('guessnumber-game-screen').classList.add('hidden');
+                    document.getElementById('guessnumber-result').textContent = '';
+                    document.querySelector('#modal-guessnumber .bet-input').disabled = false;
+                };
+
+                document.getElementById('guessnumber-start-btn').addEventListener('click', () => {
+                    guessNumberBet = getValidBet('#modal-guessnumber');
+                    if (guessNumberBet === null) return;
+
+                    currentUser.balance -= guessNumberBet;
+                    saveUserData();
+
+                    guessNumberSecret = Math.floor(Math.random() * 100) + 1;
+                    guessNumberAttempts = 3;
+                    
+                    document.getElementById('guessnumber-attempts').textContent = guessNumberAttempts;
+                    document.getElementById('guessnumber-input').value = '';
+                    document.getElementById('guessnumber-result').textContent = 'Angka rahasia telah ditentukan. Silakan tebak!';
+                    
+                    document.getElementById('guessnumber-start-screen').classList.add('hidden');
+                    document.getElementById('guessnumber-game-screen').classList.remove('hidden');
+                    document.querySelector('#modal-guessnumber .bet-input').disabled = true;
+                });
+
+                document.getElementById('guessnumber-guess-btn').addEventListener('click', () => {
+                    const guessInput = document.getElementById('guessnumber-input');
+                    const resultEl = document.getElementById('guessnumber-result');
+                    const guess = parseInt(guessInput.value);
+
+                    if (isNaN(guess) || guess < 1 || guess > 100) {
+                        resultEl.textContent = 'Masukkan angka valid antara 1 dan 100.';
+                        return;
+                    }
+
+                    guessNumberAttempts--;
+                    document.getElementById('guessnumber-attempts').textContent = guessNumberAttempts;
+
+                    if (guess === guessNumberSecret) {
+                        let multiplier = 0;
+                        if (guessNumberAttempts === 2) multiplier = 5;      // 1st try
+                        else if (guessNumberAttempts === 1) multiplier = 3; // 2nd try
+                        else if (guessNumberAttempts === 0) multiplier = 2; // 3rd try
+
+                        const winnings = guessNumberBet * multiplier;
+                        currentUser.balance += winnings;
+                        saveUserData();
+                        
+                        resultEl.innerHTML = `BENAR! Angkanya adalah ${guessNumberSecret}.<br>Anda menang ${winnings.toLocaleString('id-ID')}!`;
+                        endGuessNumberGame();
+
+                    } else {
+                        if (guessNumberAttempts > 0) {
+                            const diff = Math.abs(guess - guessNumberSecret);
+                            let hint = '';
+                            if (guess < guessNumberSecret) {
+                                hint = 'Terlalu KECIL. ';
+                                if (diff < 5) hint += 'Tambah dikit lagi!';
+                            } else {
+                                hint = 'Terlalu BESAR. ';
+                                if (diff < 5) hint += 'Kurangi dikit lagi!';
+                            }
+                            resultEl.textContent = hint;
+                        } else {
+                            resultEl.innerHTML = `Kesempatan habis! Angka rahasianya adalah ${guessNumberSecret}.<br>Anda kalah.`;
+                            endGuessNumberGame();
+                        }
+                    }
+                    guessInput.value = '';
+                    guessInput.focus();
+                });
+                
+                // --- TRADING LOGIC ---
+                let tradingState = {};
+                let tradingCountdownInterval, tradingAnimationInterval;
+
+                window.draw_tradingcanvas = () => {
+                    const canvas = document.getElementById('trading-canvas');
+                    if (!canvas || !canvas.getContext) return;
+                    const ctx = canvas.getContext('2d');
+                    const { width, height } = canvas;
+                    const data = tradingState.chartData || [];
+                    if (data.length === 0) return;
+
+                    ctx.clearRect(0, 0, width, height);
+
+                    const maxPrice = Math.max(...data, tradingState.startPrice);
+                    const minPrice = Math.min(...data, tradingState.startPrice);
+                    const priceRange = maxPrice - minPrice || 1;
+                    
+                    const toY = (price) => height - ((price - minPrice) / priceRange) * (height - 20) - 10;
+                    const toX = (index) => (index / (data.length -1)) * width;
+
+                    // Draw start price line
+                    const startY = toY(tradingState.startPrice);
+                    ctx.strokeStyle = '#64748B'; // slate-500
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, startY);
+                    ctx.lineTo(width, startY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Draw price line
+                    const lastPrice = data[data.length - 1];
+                    ctx.strokeStyle = lastPrice >= tradingState.startPrice ? '#22C55E' : '#EF4444'; // green/red
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, toY(data[0]));
+                    data.forEach((price, index) => {
+                        ctx.lineTo(toX(index), toY(price));
+                    });
+                    ctx.stroke();
+                };
+
+                const endTradingGame = () => {
+                    document.getElementById('trading-start-screen').classList.remove('hidden');
+                    document.getElementById('trading-game-screen').classList.add('hidden');
+                    document.querySelector('#modal-trading .bet-input').disabled = false;
+                };
+
+                const evaluateTradingResult = () => {
+                    const finalPrice = tradingState.chartData[tradingState.chartData.length - 1];
+                    const outcome = finalPrice > tradingState.startPrice ? 'up' : 'down';
+                    const resultEl = document.getElementById('trading-result');
+                    
+                    if (tradingState.prediction === outcome) {
+                        const priceDiff = Math.abs(finalPrice - tradingState.startPrice);
+                        let multiplier = 2; // Default close win
+                        if (priceDiff > tradingState.startPrice * 0.1) multiplier = 5; // Far win
+                        else if (priceDiff > tradingState.startPrice * 0.05) multiplier = 3; // Medium win
+                        
+                        const winnings = tradingState.bet * multiplier;
+                        currentUser.balance += winnings;
+                        resultEl.textContent = `Prediksi BENAR! Anda menang ${winnings.toLocaleString('id-ID')}!`;
+                    } else {
+                        resultEl.textContent = `Prediksi SALAH! Anda kalah.`;
+                    }
+                    saveUserData();
+                    endTradingGame();
+                };
+
+                const runTradingAnimation = () => {
+                    let steps = 0;
+                    tradingAnimationInterval = setInterval(() => {
+                        const lastPrice = tradingState.chartData[tradingState.chartData.length - 1];
+                        const volatility = lastPrice * 0.02;
+                        const newPrice = Math.max(0, lastPrice + (Math.random() - 0.48) * volatility);
+                        tradingState.chartData.push(newPrice);
+                        document.getElementById('trading-price').textContent = newPrice.toFixed(2);
+                        draw_tradingcanvas();
+                        
+                        steps++;
+                        if (steps >= 50) { // Animate for 5 seconds
+                            clearInterval(tradingAnimationInterval);
+                            evaluateTradingResult();
+                        }
+                    }, 100);
+                };
+
+                const handleTradingPrediction = (prediction) => {
+                    tradingState.prediction = prediction;
+                    document.getElementById('trading-up-btn').disabled = true;
+                    document.getElementById('trading-down-btn').disabled = true;
+                    document.getElementById('trading-result').textContent = 'Prediksi dikunci! Menunggu hasil...';
+
+                    if (tradingState.countdown <= 0) { // If timer already finished
+                        runTradingAnimation();
+                    }
+                };
+
+                window.setup_trading = () => {
+                    if (tradingCountdownInterval) clearInterval(tradingCountdownInterval);
+                    if (tradingAnimationInterval) clearInterval(tradingAnimationInterval);
+                    document.getElementById('trading-start-screen').classList.remove('hidden');
+                    document.getElementById('trading-game-screen').classList.add('hidden');
+                    document.getElementById('trading-result').textContent = '';
+                    document.querySelector('#modal-trading .bet-input').disabled = false;
+                };
+
+                document.getElementById('trading-start-btn').addEventListener('click', () => {
+                    const bet = getValidBet('#modal-trading');
+                    if (bet === null) return;
+
+                    currentUser.balance -= bet;
+                    saveUserData();
+
+                    tradingState = {
+                        bet: bet,
+                        prediction: null,
+                        countdown: 20,
+                        startPrice: 100 + (Math.random() - 0.5) * 20,
+                        chartData: [100 + (Math.random() - 0.5) * 10]
+                    };
+                    for(let i=0; i<10; i++) {
+                        const last = tradingState.chartData[i];
+                        tradingState.chartData.push(last + (Math.random() - 0.5) * 5);
+                    }
+                    tradingState.chartData.push(tradingState.startPrice);
+
+                    document.getElementById('trading-price').textContent = tradingState.startPrice.toFixed(2);
+                    document.getElementById('trading-timer').textContent = tradingState.countdown;
+                    document.getElementById('trading-result').textContent = '';
+                    
+                    const upBtn = document.getElementById('trading-up-btn');
+                    const downBtn = document.getElementById('trading-down-btn');
+                    upBtn.disabled = false;
+                    downBtn.disabled = false;
+
+                    document.getElementById('trading-start-screen').classList.add('hidden');
+                    document.getElementById('trading-game-screen').classList.remove('hidden');
+                    document.querySelector('#modal-trading .bet-input').disabled = true;
+
+                    handleCanvasResize();
+                    
+                    tradingCountdownInterval = setInterval(() => {
+                        tradingState.countdown--;
+                        document.getElementById('trading-timer').textContent = tradingState.countdown;
+                        if (tradingState.countdown <= 0) {
+                            clearInterval(tradingCountdownInterval);
+                            upBtn.disabled = true;
+                            downBtn.disabled = true;
+                            if (tradingState.prediction) {
+                                runTradingAnimation();
+                            } else {
+                                document.getElementById('trading-result').textContent = 'Waktu habis! Menjalankan chart...';
+                                setTimeout(runTradingAnimation, 1000);
+                            }
+                        }
+                    }, 1000);
+                });
+                document.getElementById('trading-up-btn').addEventListener('click', () => handleTradingPrediction('up'));
+                document.getElementById('trading-down-btn').addEventListener('click', () => handleTradingPrediction('down'));
+
             }
             // --- START THE APP ---
             initializeApp();
