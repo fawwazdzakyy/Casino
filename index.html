@@ -26,7 +26,7 @@
             background-position: center;
         }
 
-        .modal-content, .auth-form {
+        .modal-content, .auth-form, #result-popup {
             animation: slide-up 0.3s ease-out;
         }
         @keyframes slide-up {
@@ -60,13 +60,14 @@
         @keyframes pulse { 0%, 100% { transform: scale(1.1); } 50% { transform: scale(1.2); } }
         
         .card {
-            width: 50px;
-            height: 70px;
+            width: 4rem; /* w-16 */
+            height: 6rem; /* h-24 */
             border-radius: 5px;
             background-color: white;
             border: 1px solid #333;
             color: black;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             font-size: 1.2rem;
@@ -79,7 +80,7 @@
         /* Responsive Canvas Styling */
         .canvas-container {
             width: 100%;
-            max-width: 350px; /* Max size for wheel on larger screens */
+            max-width: 350px;
             aspect-ratio: 1 / 1;
             margin-left: auto;
             margin-right: auto;
@@ -130,10 +131,10 @@
         <div id="register-form" class="auth-form bg-slate-900 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md hidden">
             <h2 class="text-2xl sm:text-3xl font-bold text-center text-amber-400 mb-6">Buat Akun Baru</h2>
             <form id="register-form-submit" class="space-y-4">
-                <input type="text" id="register-username" placeholder="Username (min. 5 karakter)" class="auth-input" required>
-                <input type="tel" id="register-phone" placeholder="Nomor HP (Contoh: 08123456789)" class="auth-input" required>
-                <input type="email" id="register-email" placeholder="Email (Contoh: user@email.com)" class="auth-input" required>
-                <input type="password" id="register-password" placeholder="Password (min. 8 karakter)" class="auth-input" required>
+                <input type="text" id="register-username" placeholder="Username" class="auth-input" required>
+                <input type="tel" id="register-phone" placeholder="Phone number" class="auth-input" required>
+                <input type="email" id="register-email" placeholder="Email" class="auth-input" required>
+                <input type="password" id="register-password" placeholder="Password" class="auth-input" required>
                 <p id="register-error" class="text-red-500 text-center h-5 text-sm"></p>
                 <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg text-base sm:text-lg transition duration-300">Daftar</button>
             </form>
@@ -208,6 +209,17 @@
     <div id="refill-notification" class="hidden fixed bottom-5 right-5 bg-green-600 text-white py-3 px-5 rounded-lg shadow-lg transition-opacity duration-500 z-[200]">
         Saldo Anda telah diisi ulang sebesar 5.000!
     </div>
+    
+    <!-- Universal Result Popup -->
+    <div id="result-popup-container" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[110] hidden p-4">
+        <div id="result-popup" class="bg-slate-800 p-8 rounded-lg shadow-2xl w-[95%] sm:w-full max-w-sm text-center">
+            <i id="result-popup-icon" class="w-16 h-16 mx-auto mb-4"></i>
+            <h2 id="result-popup-title" class="text-2xl font-bold mb-2"></h2>
+            <p id="result-popup-message" class="text-gray-300 mb-6"></p>
+            <button id="result-popup-close-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-lg">Tutup</button>
+        </div>
+    </div>
+
 
     <!-- SCRIPT UTAMA -->
     <script>
@@ -442,7 +454,8 @@
                         const container = canvas.parentElement;
                         canvas.width = container.clientWidth;
                         canvas.height = container.clientHeight;
-                        if(window[`draw_${id.replace('-', '')}`]) window[`draw_${id.replace('-', '')}`]();
+                        const drawFunctionName = `draw_${id.replace(/-/g, '')}`;
+                        if(window[drawFunctionName]) window[drawFunctionName]();
                     }
                 });
             };
@@ -469,6 +482,10 @@
                      if (e.target.classList.contains('close-modal') || e.target === modalContainer) {
                         closeModal();
                     }
+                });
+
+                document.getElementById('result-popup-close-btn').addEventListener('click', () => {
+                     document.getElementById('result-popup-container').classList.add('hidden');
                 });
 
                 attachGameLogicListeners();
@@ -515,6 +532,27 @@
                     cancelAnimationFrame(crashGameLoopId);
                     crashGameLoopId = null;
                 }
+            };
+            
+            const showResultPopup = (isWin, title, message) => {
+                const container = document.getElementById('result-popup-container');
+                const iconEl = document.getElementById('result-popup-icon');
+                const titleEl = document.getElementById('result-popup-title');
+                const messageEl = document.getElementById('result-popup-message');
+
+                titleEl.textContent = title;
+                messageEl.innerHTML = message;
+
+                if (isWin) {
+                    iconEl.dataset.lucide = 'party-popper';
+                    titleEl.className = 'text-2xl font-bold mb-2 text-green-400';
+                } else {
+                    iconEl.dataset.lucide = 'x-circle';
+                    titleEl.className = 'text-2xl font-bold mb-2 text-red-400';
+                }
+                
+                lucide.createIcons();
+                container.classList.remove('hidden');
             };
 
             // --- GAME LOGIC IMPLEMENTATIONS ---
@@ -754,7 +792,7 @@
                             <button id="trading-down-btn" class="w-1/2 bg-red-600 hover:bg-red-700 font-bold py-3 rounded-lg flex items-center justify-center gap-2">Turun <i data-lucide="trending-down"></i></button>
                         </div>
                     </div>
-                    ${gameResultHTML('trading-result')}
+                    <p id="trading-result" class="text-center h-8 my-4 font-bold text-lg sm:text-xl"></p>
                     ${gameBalanceHTML}
                 </div>`
             });
@@ -816,12 +854,12 @@
                 
                 const createCardElement = (card, isHidden = false) => {
                     const cardEl = document.createElement('div');
-                    cardEl.className = 'card w-1/6 sm:w-1/5'; // Responsive card width
+                     cardEl.className = 'card'; 
                     if (isHidden) {
                         cardEl.classList.add('hidden-card');
                         cardEl.innerHTML = '';
                     } else {
-                        cardEl.innerHTML = `${card.value}<br>${card.suit}`;
+                        cardEl.innerHTML = `<span>${card.value}</span><span>${card.suit}</span>`;
                         if (['♥', '♦'].includes(card.suit)) {
                             cardEl.classList.add('red');
                         }
@@ -1656,7 +1694,7 @@
                      }, 4100);
                 });
 
-                // --- GUESS THE NUMBER LOGIC ---
+                // --- GUESS THE NUMBER LOGIC (with Popup) ---
                 let guessNumberSecret, guessNumberAttempts, guessNumberBet;
                 
                 const endGuessNumberGame = () => {
@@ -1684,7 +1722,7 @@
                     
                     document.getElementById('guessnumber-attempts').textContent = guessNumberAttempts;
                     document.getElementById('guessnumber-input').value = '';
-                    document.getElementById('guessnumber-result').textContent = 'Angka rahasia telah ditentukan. Silakan tebak!';
+                    document.getElementById('guessnumber-result').textContent = 'Angka rahasia ditentukan. Tebaklah!';
                     
                     document.getElementById('guessnumber-start-screen').classList.add('hidden');
                     document.getElementById('guessnumber-game-screen').classList.remove('hidden');
@@ -1714,7 +1752,7 @@
                         currentUser.balance += winnings;
                         saveUserData();
                         
-                        resultEl.innerHTML = `BENAR! Angkanya adalah ${guessNumberSecret}.<br>Anda menang ${winnings.toLocaleString('id-ID')}!`;
+                        showResultPopup(true, 'Anda Menang!', `Tebakan Anda BENAR! Angka rahasianya adalah ${guessNumberSecret}.<br>Anda memenangkan ${winnings.toLocaleString('id-ID')}!`);
                         endGuessNumberGame();
 
                     } else {
@@ -1730,7 +1768,7 @@
                             }
                             resultEl.textContent = hint;
                         } else {
-                            resultEl.innerHTML = `Kesempatan habis! Angka rahasianya adalah ${guessNumberSecret}.<br>Anda kalah.`;
+                            showResultPopup(false, 'Anda Kalah!', `Kesempatan habis! Angka rahasianya adalah ${guessNumberSecret}.`);
                             endGuessNumberGame();
                         }
                     }
@@ -1738,7 +1776,7 @@
                     guessInput.focus();
                 });
                 
-                // --- TRADING LOGIC ---
+                // --- TRADING LOGIC (with Popup) ---
                 let tradingState = {};
                 let tradingCountdownInterval, tradingAnimationInterval;
 
@@ -1790,7 +1828,6 @@
                 const evaluateTradingResult = () => {
                     const finalPrice = tradingState.chartData[tradingState.chartData.length - 1];
                     const outcome = finalPrice > tradingState.startPrice ? 'up' : 'down';
-                    const resultEl = document.getElementById('trading-result');
                     
                     if (tradingState.prediction === outcome) {
                         const priceDiff = Math.abs(finalPrice - tradingState.startPrice);
@@ -1800,9 +1837,9 @@
                         
                         const winnings = tradingState.bet * multiplier;
                         currentUser.balance += winnings;
-                        resultEl.textContent = `Prediksi BENAR! Anda menang ${winnings.toLocaleString('id-ID')}!`;
+                        showResultPopup(true, 'Anda Menang!', `Prediksi Anda BENAR! Anda memenangkan ${winnings.toLocaleString('id-ID')} (x${multiplier}).`);
                     } else {
-                        resultEl.textContent = `Prediksi SALAH! Anda kalah.`;
+                        showResultPopup(false, 'Anda Kalah!', 'Prediksi Anda salah. Coba lagi lain kali.');
                     }
                     saveUserData();
                     endTradingGame();
@@ -1889,10 +1926,11 @@
                             upBtn.disabled = true;
                             downBtn.disabled = true;
                             if (tradingState.prediction) {
-                                runTradingAnimation();
-                            } else {
                                 document.getElementById('trading-result').textContent = 'Waktu habis! Menjalankan chart...';
                                 setTimeout(runTradingAnimation, 1000);
+                            } else {
+                                showResultPopup(false, "Waktu Habis", "Anda tidak membuat prediksi. Taruhan hangus.");
+                                endTradingGame();
                             }
                         }
                     }, 1000);
