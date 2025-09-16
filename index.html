@@ -766,7 +766,7 @@
                             <input type="number" id="guessnumber-input" class="bg-slate-700 text-white text-center rounded-lg p-2 w-40" min="1" max="100">
                             <button id="guessnumber-guess-btn" class="bg-blue-600 hover:bg-blue-700 font-bold py-2 px-8 rounded-lg mt-2">TEBAK</button>
                         </div>
-                        <p class="text-center mt-2 text-amber-300">Sisa Kesempatan: <span id="guessnumber-attempts">3</span></p>
+                        <p class="text-center mt-2 text-amber-300">Sisa Kesempatan: <span id="guessnumber-attempts">5</span></p>
                     </div>
                     ${gameResultHTML('guessnumber-result')}
                     ${gameBalanceHTML}
@@ -1171,31 +1171,36 @@
                 let multiplier, crashPoint, gameState; // ready, playing, crashed
 
                 const crashGameLoop = () => {
-                    // Dynamic multiplier increase
-                    if (multiplier < 10) {
-                        multiplier += 0.005;
-                    } else if (multiplier < 50) {
-                        multiplier += 0.02;
-                    } else {
-                        multiplier += 0.1;
-                    }
-                    
-                    multiplierEl.textContent = `${multiplier.toFixed(2)}x`;
-                    draw_crashcanvas();
+    if (multiplier < 3) {
+        multiplier += 0.001; // sangat lambat
+    } else if (multiplier < 5) {
+        multiplier += 0.002; // lebih cepat 5x
+    } else if (multiplier < 10) {
+        multiplier += 0.005; // tambah cepat 2x dari sebelumnya
+    } else if (multiplier < 20) {
+        multiplier += 0.012; // 10% lebih cepat
+    } else if (multiplier < 50) {
+        multiplier += 0.020; // 15% lebih cepat
+    } else {
+        multiplier += 0.1; // di atas 50 makin ngebut
+    }
 
-                    if (multiplier >= crashPoint) {
-                        gameState = 'crashed';
-                        cancelAnimationFrame(crashGameLoopId);
-                        crashGameLoopId = null;
-                        multiplierEl.style.color = '#EF4444'; // red-500
-                        crashResultEl.textContent = `CRASH di ${crashPoint.toFixed(2)}x!`;
-                        crashBtn.textContent = 'Mulai Lagi';
-                        crashBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg text-lg uppercase transition duration-300";
-                        saveUserData(); // Save balance on crash
-                    } else {
-                        crashGameLoopId = requestAnimationFrame(crashGameLoop);
-                    }
-                };
+    multiplierEl.textContent = `${multiplier.toFixed(2)}x`;
+    draw_crashcanvas();
+
+    if (multiplier >= crashPoint) {
+        gameState = 'crashed';
+        cancelAnimationFrame(crashGameLoopId);
+        crashGameLoopId = null;
+        multiplierEl.style.color = '#EF4444'; // merah
+        crashResultEl.textContent = `CRASH di ${crashPoint.toFixed(2)}x!`;
+        crashBtn.textContent = 'Mulai Lagi';
+        crashBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg text-lg uppercase transition duration-300";
+        saveUserData();
+    } else {
+        crashGameLoopId = requestAnimationFrame(crashGameLoop);
+    }
+};
 
                 window.setup_crash = () => {
                     gameState = 'ready';
@@ -1718,7 +1723,7 @@
                     saveUserData();
 
                     guessNumberSecret = Math.floor(Math.random() * 100) + 1;
-                    guessNumberAttempts = 3;
+                    guessNumberAttempts = 5;
                     
                     document.getElementById('guessnumber-attempts').textContent = guessNumberAttempts;
                     document.getElementById('guessnumber-input').value = '';
@@ -1744,9 +1749,10 @@
 
                     if (guess === guessNumberSecret) {
                         let multiplier = 0;
-                        if (guessNumberAttempts === 2) multiplier = 5;      // 1st try
-                        else if (guessNumberAttempts === 1) multiplier = 3; // 2nd try
-                        else if (guessNumberAttempts === 0) multiplier = 2; // 3rd try
+if (guessNumberAttempts === 4) multiplier = 8;      // 1st try
+else if (guessNumberAttempts === 3 || guessNumberAttempts === 2) multiplier = 4; // 2nd & 3rd try
+else if (guessNumberAttempts === 1) multiplier = 2; // 4th try
+// Attempts === 0 => kalah, tidak ada multiplier
 
                         const winnings = guessNumberBet * multiplier;
                         currentUser.balance += winnings;
